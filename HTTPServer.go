@@ -1,63 +1,43 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"net/http"
-	"path/filepath"
+	"os"
 )
 
-type EndPointAdditions struct {
-	cssPaths     []string
-	jsPaths      []string
-	templateData any
-}
-
-type EndPointData struct {
-	requestPath string
-	// hostPath       string
-	additionalData any
-}
-
-type HTTPServer struct {
+type SimpleServer struct {
+	htmlDir     string
+	cssDir      string
+	templateDir string
 	multiplexer *http.ServeMux
-	endPoints   []EndPointData
 }
 
-func NewHTTPServer(sm *http.ServeMux) *HTTPServer {
-	s := new(HTTPServer)
-	if sm != nil {
-		s.multiplexer = sm
-	} else {
+func NewSimpleServer(htmlDir string, cssDir, templateDir string, multiplxr *http.ServeMux) *SimpleServer {
+	s := new(SimpleServer)
+	err := os.MkdirAll(htmlDir, os.ModePerm)
+	if err != nil {
+		panic("Could not create " + htmlDir)
+	}
+	s.htmlDir = htmlDir
+	err = os.MkdirAll(cssDir, os.ModePerm)
+	if err != nil {
+		panic("Could not create " + cssDir)
+	}
+	s.cssDir = cssDir
+	err = os.MkdirAll(templateDir, os.ModePerm)
+	if err != nil {
+		panic("Could not create " + templateDir)
+	}
+	s.templateDir = templateDir
+	if multiplxr == nil {
 		s.multiplexer = http.NewServeMux()
+	} else {
+		s.multiplexer = multiplxr
 	}
 	return s
 }
 
-func (s *HTTPServer) addHandler(requstPath string, handler http.Handler) {
-	s.endPoints = append(s.endPoints, EndPointData{
-		requestPath:    requstPath,
-		additionalData: handler,
-	})
-	s.multiplexer.Handle(requstPath, handler)
-}
-
-func (s *HTTPServer) addEndPoint(requestPath string, additionalData any) {
-	s.endPoints = append(s.endPoints, EndPointData{
-		requestPath:    requestPath,
-		additionalData: additionalData,
-		// hostPath:       hostPath,
-	})
-
-	s.multiplexer.HandleFunc(requestPath, func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("Handler Executed")
-		fmt.Println("Serving: " + r.URL.Path)
-		filePath := "." + r.URL.Path
-		ext := filepath.Ext(filePath)
-
-		w.Header().Set("Content-type", "text/"+ext[1:])
-
-		compose(w, filePath, additionalData, func() {
-			http.ServeFile(w, r, filePath)
-		})
-	})
+func (s *SimpleServer) Start(addr string) {
+	log.Fatal(http.ListenAndServe(addr, s.multiplexer))
 }
